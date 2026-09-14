@@ -1,0 +1,212 @@
+  install.packages("twitteR")
+install.packages("wordcloud")
+install.packages("wordcloud2")
+install.packages("tm")
+install.packages("rtweet")
+install.packages("corpus")
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("readr")
+install.packages("textdata")
+install.packages("zoo")
+install.packages("sentimentr")
+install.packages("flextable")
+install.packages("plyr")
+install.packages("twitteR")
+install.packages("tidyverse")
+install.packages("tidytext")
+install.packages("stringr")
+install.packages("lexicon")
+install.packages("ggplot2")
+
+library(twitteR)
+library(wordcloud)
+library(wordcloud2)
+library(tm)
+library(rtweet)
+library(corpus)
+library(dplyr)
+library(stringr)
+library(readr)
+library(textdata)
+library(zoo)
+library(Hmisc)
+library(sentimentr)
+library(flextable)
+library(plyr)
+library(twitteR)
+library(tidyverse)
+library(tidytext)
+library(stringr)
+library(lexicon)
+library(ggplot2)
+#to get your consumerKey and consumerSecret see the twitteR 
+documentation for instructions
+consumer_key <- ''
+consumer_secret <- ''
+access_token <- ''
+access_secret <- ''
+setup_twitter_oauth(consumer_key,
+ consumer_secret,
+ access_token,
+ access_secret)
+#CRAWLING DATA
+tw = searchTwitter("wisata pantai jogja",
+ n = 1000, lang = "id",
+ retryOnRateLimit = 100, resultType = "recent")
+#SAVE DATASET
+saveRDS(tw1,file = 'wisata pantai jojga.rds')
+#LOAD DATA
+tw1 <-readRDS('wisata pantai jogja.rds')
+#KONVEKSI DATA TWITTER KE DATA FRAME
+d1 = twListToDF(tw1)
+#MENGGABUNGKAN KETIGA DATASET
+gabung <- rbind(d1)
+View(gabung)
+#HANYA MENGAMBIL DATA TEKS
+#UBAH DATA MENJADI KORPUS
+teks <- gabung$text
+teks.corpus <- Corpus(VectorSource(teks))
+##CLEANING DATA
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+twitclean <- tm_map(teks.corpus, removeURL)
+removeNL <- function(y) gsub("\n", " ", y)
+twitclean <- tm_map(twitclean, removeNL)
+replacecomma <- function(y) gsub(",", "", y)
+twitclean <- tm_map(twitclean, replacecomma)
+removeRT <- function(y) gsub("RT ", "", y)
+twitclean <- tm_map(twitclean, removeRT)
+removetitik2 <- function(y) gsub(":", "", y)
+twitclean <- tm_map(twitclean, removetitik2)
+removetitikkoma <- function(y) gsub(";", " ", y)
+twitclean <- tm_map(twitclean, removetitikkoma)
+removetitik3 <- function(y) gsub("p.", "", y)
+twitclean <- tm_map(twitclean, removetitik3)
+removeamp <- function(y) gsub("&amp;", "", y)
+twitclean <- tm_map(twitclean, removeamp)
+removeUN <- function(z) gsub("@\\w+", "", z)
+twitclean <- tm_map(twitclean, removeUN)
+remove.all <- function(xy) gsub("[^[:alpha:][:space:]]*", "", xy)
+twitclean <- tm_map(twitclean,remove.all)
+twitclean <-tm_map(twitclean,stripWhitespace)
+twitclean <- tm_map(twitclean,remove.all)
+#tanda baca
+twitclean <- tm_map(twitclean, removePunctuation)
+#mengubah huruf kecil
+twitclean <- tm_map(twitclean, tolower) 
+#menghapus slangwords
+slang = read.csv(file.choose())
+old_slang <- as.character(slang$old)
+new_slang <- as.character(slang$new)
+slangword <- function(x)Reduce(function(x,r)gsub(slang$old[r], 
+slang$new[r],x,fixed=T),seq_len(nrow(slang)),x)
+#menghapus stopwords
+myStopwords <- readLines (file.choose())
+twitclean <- tm_map(twitclean,removeWords,myStopwords)
+gakpenting <- readLines (file.choose())
+twitclean <- tm_map(twitclean,removeWords,gakpenting)
+#stemming kata
+twitclean <- tm_map(twitclean, stemDocument)
+#menghapus kata-kata yang tidak dibutuhkan
+twitclean <- tm_map(twitclean , removeWords, 
+c('pantai','jogja','gunung','kidul','kulon','progo'
+ ,'ivat','guid','buka','referensi'))
+#TOKENIZING
+#HITUNG DATA YANG SERING MUNCUL
+{
+ dtm <- TermDocumentMatrix(twitclean)
+ m <- as.matrix(dtm)
+ v <- sort(rowSums(m), decreasing=TRUE)
+ databersih <- data.frame(word=names(v), freq=v)
+}
+head(databersih, n=20) #20 teratas
+#WORDCLOUD
+wordcloud <- wordcloud2(databersih,shape = "cloud",
+ size=1/2,
+ minRotation = -pi/0,
+ maxRotation = -pi/0,
+ rotateRatio = 1,
+ color = "random-dark")
+wordcloud
+#KLASIFIKASI LEXICON
+#INPUT KAMUS KATA POSITIF DAN NEGATIF
+pos <- scan(file.choose())
+neg <- scan(file.choose())
+data_translate_clean <- read.csv(file.choose())
+#
+data_translate_clean$x <- as.character(data_translate_clean$x)
+str(data_translate_clean)
+corpus <- data_translate_clean$x
+#UBAH KE DATA CORPUS
+dtm_translate <-
+DocumentTermMatrix(VCorpus(VectorSource(data_translate_clean)))
+dtm_translate <-
+DocumentTermMatrix(VCorpus(VectorSource(data_translate_clean$x)))
+#TOKENIZING
+translate_split <- str_split(data_translate_clean$x, 
+pattern="\\s+")
+#SKORING NEGATIF POSITIF
+lapply(translate_split, function(x){sum(!is.na(match(x,pos)))}) # 
+many words match the positive bundle in the positive dictionary
+lapply(translate_split, function(x){sum(!is.na(match(x,neg)))}) # 
+many words match the negative bundle in the negative dictionary
+skor <- lapply(translate_split, 
+function(x){sum(!is.na(match(x,pos))) -
+sum(!is.na(match(x,neg)))}) #score sentiment
+#PENENTUAN SENTIMEN BERDASARKAN SKOR
+#data_translate_clean$sentiment <- skor
+skorrrr <- data_translate_clean
+data_translate_clean$sentiment[data_translate_clean$sentiment == 
+0] = "Neutral"
+data_translate_clean$sentiment[data_translate_clean$sentiment < 0] 
+= "Negative"
+data_translate_clean$sentiment[data_translate_clean$sentiment > 0] 
+= "Positive"
+data_translate_clean$sentiment <-
+unlist(data_translate_clean$sentiment, use.names = T)
+write.csv(data_translate_clean, file = 
+"data_translate_clean_sentimen1.csv", row.names = F)
+#string split
+translate_splitstring <- str_split(data_translate_clean$x, 
+pattern="\\s+")
+lapply(translate_splitstring, 
+function(x){sum(!is.na(match(x,pos)))}) # many words match the 
+positive bundle in the positive dictionary
+lapply(translate_splitstring, 
+function(x){sum(!is.na(match(x,neg)))}) # many words match the 
+negative bundle in the negative dictionary
+data_translate_scoresentiment <- lapply(translate_splitstring, 
+function(x){sum(!is.na(match(x,pos))) -
+sum(!is.na(match(x,neg)))}) #score sentiment
+data_translate_clean$sentiment <- data_translate_scoresentiment
+write.csv(data_translate_clean$sentiment, file = 
+"datatranslate_score.csv", row.names = F)
+data_translate_clean$sentiment[data_translate_clean$sentiment == 
+0] = "Netral"
+data_translate_clean$sentiment[data_translate_clean$sentiment < 0] 
+= "Negative"
+data_translate_clean$sentiment[data_translate_clean$sentiment > 0] 
+= "Positive"
+data_translate_clean$sentiment <-
+unlist(data_translate_clean$sentiment, use.names = T)
+write.csv(data_translate_clean, file = "datatranslate_skor.csv", 
+row.names = F)
+datatranslate_score_sentiment <- read.csv(file.choose())
+datatranslate_skor_sentiment <- read.csv(file.choose())
+datatranslate_score_sentiment$text <-
+as.numeric(datatranslate_score_sentiment$x)
+datatranslate_score_sentiment$sentiment <-
+as.numeric(datatranslate_score_sentiment$sentiment)
+#frequencies sentiment word in R (Positive, Negative, and Netral 
+sentiment in R)
+datatranslate_frequency <-
+data.frame(table(unlist(strsplit(tolower(data_translate_clean$sent
+iment), " "))))
+datatranslate_frequency$Var1 <-
+as.numeric(datatranslate_frequency$Var1)
+datatranslate_frequency$Freq <-
+as.numeric(datatranslate_frequency$Freq)
+dev.off()
+ggplot(datatranslate_frequency,aes(x=Var1, y=Freq, fill=Var1)) +
+ geom_col() +
+ labs(y="frequency")
